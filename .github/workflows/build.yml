@@ -24,6 +24,129 @@ jobs:
           flutter-version: '3.24.0'
           channel: 'stable'
 
+      - name: Create Android Project Files
+        run: |
+          # Create directory structure
+          mkdir -p android/app/src/main/kotlin/com/whatsmind/app
+          mkdir -p android/app/src/main/res/values
+          
+          # Create app-level build.gradle
+          cat > android/app/build.gradle << 'EOF'
+          plugins {
+              id "com.android.application"
+              id "kotlin-android"
+              id "dev.flutter.flutter-gradle-plugin"
+          }
+          
+          android {
+              namespace "com.whatsmind.app"
+              compileSdkVersion flutter.compileSdkVersion
+              ndkVersion flutter.ndkVersion
+              
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_1_8
+                  targetCompatibility JavaVersion.VERSION_1_8
+              }
+              
+              kotlinOptions {
+                  jvmTarget = '1.8'
+              }
+              
+              defaultConfig {
+                  applicationId "com.whatsmind.app"
+                  minSdkVersion 21
+                  targetSdkVersion flutter.targetSdkVersion
+                  versionCode 1
+                  versionName "1.0.0"
+              }
+              
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.debug
+                  }
+              }
+          }
+          
+          flutter {
+              source '../..'
+          }
+          EOF
+          
+          # Create project-level build.gradle
+          cat > android/build.gradle << 'EOF'
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          
+          rootProject.buildDir = '../build'
+          subprojects {
+              project.buildDir = "${rootProject.buildDir}/${project.name}"
+              project.evaluationDependsOn(':app')
+          }
+          
+          tasks.register("clean", Delete) {
+              delete rootProject.buildDir
+          }
+          EOF
+          
+          # Create settings.gradle
+          cat > android/settings.gradle << 'EOF'
+          pluginManagement {
+              def flutterSdkPath = {
+                  def properties = new Properties()
+                  file("local.properties").withInputStream { properties.load(it) }
+                  def flutterSdkPath = properties.getProperty("flutter.sdk")
+                  assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+                  return flutterSdkPath
+              }()
+              
+              includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+              
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          
+          plugins {
+              id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+              id "com.android.application" version "7.3.0" apply false
+              id "org.jetbrains.kotlin.android" version "1.7.10" apply false
+          }
+          
+          include ":app"
+          EOF
+          
+          # Create local.properties
+          echo "flutter.sdk=${FLUTTER_ROOT}" > android/local.properties
+          
+          # Create MainActivity.kt
+          cat > android/app/src/main/kotlin/com/whatsmind/app/MainActivity.kt << 'EOF'
+          package com.whatsmind.app
+          
+          import io.flutter.embedding.android.FlutterActivity
+          
+          class MainActivity: FlutterActivity()
+          EOF
+          
+          # Create styles.xml
+          mkdir -p android/app/src/main/res/values
+          cat > android/app/src/main/res/values/styles.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="LaunchTheme" parent="@android:style/Theme.Light.NoActionBar">
+                  <item name="android:windowBackground">@android:color/white</item>
+              </style>
+              <style name="NormalTheme" parent="@android:style/Theme.Light.NoActionBar">
+                  <item name="android:windowBackground">?android:colorBackground</item>
+              </style>
+          </resources>
+          EOF
+
       - name: Get dependencies
         run: flutter pub get
 
